@@ -1,31 +1,41 @@
-name: Build & Publish Container
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  build-and-publish:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
-      # 1. Checkout the repo
       - uses: actions/checkout@v4
 
-      # 2. Log in to GHCR
+      - name: Compute version
+        id: version
+        run: echo "value=v$(date +%Y.%m.%d)-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Build the container image
-      - run: |
-          docker build -f Containerfile -t ghcr.io/the127/keyline-docs:${{ github.ref_name }} .
+      - name: Build and push image
+        env:
+          IMAGE: ghcr.io/the127/keyline-docs
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          docker build -f Containerfile -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
 
-      # 4. Push the container image
-      - run: |
-          docker push ghcr.io/the127/keyline-docs:${{ github.ref_name }}
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.value }}
+          name: ${{ steps.version.outputs.value }}
+          generate_release_notes: true
