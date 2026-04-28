@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   release:
@@ -32,6 +33,16 @@ jobs:
           docker build -f Containerfile -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
           docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:latest"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Scan and attest vulnerabilities
+        env:
+          IMAGE: ghcr.io/the127/keyline-docs
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          trivy image --format cosign-vuln --output vuln.json "$IMAGE:$VERSION"
+          cosign attest --predicate vuln.json --type vuln --yes "$IMAGE:$VERSION"
 
       - name: Create release
         uses: softprops/action-gh-release@v3
