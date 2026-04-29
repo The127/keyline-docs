@@ -36,12 +36,18 @@ jobs:
 
       - uses: sigstore/cosign-installer@v3
 
-      - name: Scan and attest vulnerabilities
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ghcr.io/the127/keyline-docs:${{ steps.version.outputs.value }}
+          format: cosign-vuln
+          output: vuln.json
+
+      - name: Attest vulnerabilities
         env:
           IMAGE: ghcr.io/the127/keyline-docs
           VERSION: ${{ steps.version.outputs.value }}
         run: |
-          trivy image --format cosign-vuln --output vuln.json "$IMAGE:$VERSION"
           cosign attest --predicate vuln.json --type vuln --yes "$IMAGE:$VERSION"
 
       - name: Create release
